@@ -17,7 +17,7 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def network_function(params, state, batch):
-        return clf.apply(params, state, None, batch, True)[0]
+        return clf.apply(params, state, batch, True)[0]
 
     @jit
     def loss_logits(logits, labels):
