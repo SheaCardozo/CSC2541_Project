@@ -145,7 +145,7 @@ def hf(clf, loss, dloss=None):
         return saved_params[chosen_ind], x
 
     def init(
-            params, xi=0.5, lambd=1.0, alpha=0.75, max_iter=5,
+            params, xi=0.5, lambd=1.0, alpha=0.75, max_iter=5, min_damp=0,
             line_search=True, fname='cg.txt', precond='uncentered',
             use_momentum=True):
         """Initializes the Hessian Free optimizer.
@@ -174,6 +174,7 @@ def hf(clf, loss, dloss=None):
             'alpha': np.array(alpha, dtype=np.float64),
             'xi': np.array(xi, dtype=np.float64),
             'v': zero_vec(params),
+            'min_damp': min_damp,
             'max_iter': max_iter,
             'line_search': line_search,
             'fname': fname,
@@ -219,6 +220,8 @@ def hf(clf, loss, dloss=None):
             opt_state['lambda'] = opt_state['lambda'] * 100 / 99
         elif rho > 3 / 4:
             opt_state['lambda'] = opt_state['lambda'] * 99 / 100
+
+        opt_state['lambda'] = max(opt_state['min_damp'], opt_state['lambda'])
 
         # Adjust "momentum"
         opt_state['xi'] = min(1.01 * opt_state['xi'], 0.99)
