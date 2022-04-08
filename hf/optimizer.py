@@ -86,7 +86,7 @@ def hf(clf, loss, dloss=None):
 
     def cg(
             lambd, b, x0, Minv, params, state, batch, labels,
-            max_iter=50, epsilon=5e-4, fname='cg.txt'):
+            max_iter=50, epsilon=5e-4):
         x = x0
         r = lin_comb(b, -1, dampened(params, state, batch, labels, x, lambd))
         z = hadamard(Minv, r)
@@ -122,13 +122,6 @@ def hf(clf, loss, dloss=None):
             elif it > max_iter:
                 break
 
-            # Save progress
-            out_str = 'CG: {:} / {:} - phi: {:.5f}, chkpt_loss: {:.5f}, lambd: {:.5f}'.format(
-                it, max_iter, phis[-1], corr_losses[-1], lambd)
-            with open(fname, 'a') as f:
-                f.write(out_str + '\n')
-            # Save progress
-
         # Start backtracking
         idx = 0
         for idx in range(1, len(saved_params))[::-1]:
@@ -136,17 +129,11 @@ def hf(clf, loss, dloss=None):
                 chosen_ind = idx
                 break
 
-        # Return the next initialization
-        with open(fname, 'a') as f:
-            f.write(f'Final batch loss: {corr_losses[idx]}\n')
-            f.write('=' * 80 + '\n')
-            f.flush()
-
         return saved_params[chosen_ind], x
 
     def init(
             params, xi=0.5, lambd=1.0, alpha=0.75, max_iter=5, min_damp=0,
-            line_search=True, fname='cg.txt', precond='uncentered',
+            line_search=True, precond='uncentered',
             use_momentum=True):
         """Initializes the Hessian Free optimizer.
 
@@ -157,14 +144,9 @@ def hf(clf, loss, dloss=None):
             alpha -- Power of the preconditioner
             max_iter -- Maximum number of CG iterations
             line_search -- Whether to use line search before returning updates
-            fname -- File name to print out CG iteration information
             precond -- Preconditioner, one of "centered", "uncentered", or "none"
             use_momentum -- Whether to use the information sharing between CG runs
         """
-
-        with open(fname, 'w') as f:
-            f.write('Starting experiment\n')
-            f.write('=' * 80 + '\n')
 
         assert precond in ['centered', 'uncentered', 'none']
 
@@ -177,7 +159,6 @@ def hf(clf, loss, dloss=None):
             'min_damp': min_damp,
             'max_iter': max_iter,
             'line_search': line_search,
-            'fname': fname,
             'precond': precond,
             'use_momentum': use_momentum
         }
@@ -206,8 +187,7 @@ def hf(clf, loss, dloss=None):
         p, opt_state['x0'] = cg(
             opt_state['lambda'], scale_vec(-1.0, batch_grad),
             scale_vec(opt_state['xi'], opt_state['x0']), Minv, params, state,
-            batch, labels, max_iter=opt_state['max_iter'],
-            fname=opt_state['fname'])
+            batch, labels, max_iter=opt_state['max_iter'])
 
         # Re-adjust lambda
         dq = dot(batch_grad, p) + 0.5 * dot(
