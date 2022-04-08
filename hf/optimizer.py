@@ -90,7 +90,7 @@ def hf(clf, loss, dloss=None):
         x = x0
         r = lin_comb(b, -1, dampened(params, state, batch, labels, x, lambd))
         z = hadamard(Minv, r)
-        p = copy_vec(z)
+        p = z
 
         it = 0
 
@@ -100,7 +100,7 @@ def hf(clf, loss, dloss=None):
 
         # Record information for CG iteration backtracking
         chosen_ind = 0
-        saved_params = [copy_vec(params)]
+        saved_params = [params]
         corr_losses = [loss(params, state, batch, labels)[0]]
 
         while True:
@@ -110,7 +110,7 @@ def hf(clf, loss, dloss=None):
                 params, state, batch, labels, x, lambd)) - dot(b, x))
             it += 1
 
-            saved_params.append(copy_vec(x))
+            saved_params.append(x)
             corr_losses.append(loss(
                 lin_comb(params, 1.0, x), state, batch, labels)[0])
 
