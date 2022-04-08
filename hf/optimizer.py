@@ -150,6 +150,13 @@ def hf(clf, loss, dloss=None):
 
         assert precond in ['centered', 'uncentered', 'none']
 
+        if precond == 'none':
+            precond = 0
+        elif precond == 'centered':
+            precond = 1
+        else:
+            precond = 2
+
         return {
             'x0': zero_vec(params),
             'lambda': np.array(lambd, dtype=np.float64),
@@ -169,9 +176,9 @@ def hf(clf, loss, dloss=None):
         """
 
         # Prepare the preconditioner
-        if opt_state['precond'] == 'none':
+        if opt_state['precond'] == 0:
             Minv = one_vec(params)
-        elif opt_state['precond'] == 'centered':
+        elif opt_state['precond'] == 1:
             Minv = Minv_factory_centered(
                 params, state, batch, labels, opt_state['lambda'],
                 opt_state['alpha'])
