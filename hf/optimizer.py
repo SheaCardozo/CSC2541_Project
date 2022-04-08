@@ -1,14 +1,16 @@
 from .utils import *
 from collections import namedtuple
+from jax import jit, grad, jvp, vjp, value_and_grad
+from functools import partial
 
 import optax
 import jax
 import jax.numpy as np
-from jax import grad, jvp, vjp, value_and_grad
 
 
 def hf(clf, loss, dloss=None):
     if dloss is None:  # If a derivative function is not supplied, take it here.
+        @partial(jit, static_argnames=('is_training',))
         def dloss(params, state, batch, labels, is_training=True):
             return value_and_grad(loss, has_aux=True)(
                 params, state, batch, labels, is_training)
