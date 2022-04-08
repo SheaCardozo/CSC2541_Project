@@ -1,4 +1,4 @@
-from utils import *
+from .utils import *
 from collections import namedtuple
 
 import optax
