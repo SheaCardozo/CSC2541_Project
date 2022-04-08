@@ -25,7 +25,10 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def loss_hvp(logits, labels, v):
-        return jvp(grad(loss_logits), (logits, labels), (v, zero_vec(labels)))[1]
+        def loss_z(z):
+            return loss_logits(z, labels)
+
+        return jvp(grad(loss_z), (logits,), (v,))[1]
 
     @jit
     def gnhvp(params, state, batch, labels, v):
