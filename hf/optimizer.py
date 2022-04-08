@@ -63,8 +63,10 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def Minv_factory_uncentered(batch_grad, lambd, alpha):
-        diag = lin_comb(
-            hadamard(batch_grad, batch_grad), lambd, one_vec(batch_grad))
+        diag = hadamard(batch_grad, batch_grad)
+        diag = tree_map(lambda x: x+lambd, diag)
+        # diag = lin_comb(
+        #     hadamard(batch_grad, batch_grad), lambd, one_vec(batch_grad))
         return tree_map(lambda x: np.power(x, -1 * alpha), diag)
 
     @jit
