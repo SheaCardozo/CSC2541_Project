@@ -29,15 +29,12 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def gnhvp(params, state, batch, labels, v):
-        float_state = tree_map(lambda x: np.array(x, dtype=np.float64), state)
-        state_zeros = zero_vec(float_state)
-        batch_zeros = np.zeros_like(batch)
-        z, R_z = jvp(
-            network_function,
-            (params, float_state, batch),
-            (v, state_zeros, batch_zeros))
+        def f_net(w):
+            return network_function(w, state, batch)
+
+        z, R_z = jvp(f_net, (params,), (v,))
         R_gz = loss_hvp(z, labels, R_z)
-        _, f_vjp = vjp(network_function, params, float_state, batch)
+        _, f_vjp = vjp(f_net, params)
         return f_vjp(R_gz)[0]
 
     @jit
