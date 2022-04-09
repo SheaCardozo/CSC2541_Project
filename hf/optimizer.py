@@ -25,19 +25,19 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def loss_hvp(logits, labels, v):
-        return jvp(grad(loss_logits), (logits, labels), (v, zero_vec(labels)))[1]
+        def loss_z(z):
+            return loss_logits(z, labels)
+
+        return jvp(grad(loss_z), (logits,), (v,))[1]
 
     @jit
     def gnhvp(params, state, batch, labels, v):
-        float_state = tree_map(lambda x: np.array(x, dtype=np.float64), state)
-        state_zeros = zero_vec(float_state)
-        batch_zeros = np.zeros_like(batch)
-        z, R_z = jvp(
-            network_function,
-            (params, float_state, batch),
-            (v, state_zeros, batch_zeros))
+        def f_net(w):
+            return network_function(w, state, batch)
+
+        z, R_z = jvp(f_net, (params,), (v,))
         R_gz = loss_hvp(z, labels, R_z)
-        _, f_vjp = vjp(network_function, params, float_state, batch)
+        _, f_vjp = vjp(f_net, params)
         return f_vjp(R_gz)[0]
 
     @jit
@@ -63,8 +63,10 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def Minv_factory_uncentered(batch_grad, lambd, alpha):
-        diag = lin_comb(
-            hadamard(batch_grad, batch_grad), lambd, one_vec(batch_grad))
+        diag = hadamard(batch_grad, batch_grad)
+        diag = tree_map(lambda x: x+lambd, diag)
+        # diag = lin_comb(
+        #     hadamard(batch_grad, batch_grad), lambd, one_vec(batch_grad))
         return tree_map(lambda x: np.power(x, -1 * alpha), diag)
 
     @jit
@@ -90,7 +92,7 @@ def hf(clf, loss, dloss=None):
         x = x0
         r = lin_comb(b, -1, dampened(params, state, batch, labels, x, lambd))
         z = hadamard(Minv, r)
-        p = copy_vec(z)
+        p = z
 
         it = 0
 
@@ -100,7 +102,7 @@ def hf(clf, loss, dloss=None):
 
         # Record information for CG iteration backtracking
         chosen_ind = 0
-        saved_params = [copy_vec(params)]
+        saved_params = [params]
         corr_losses = [loss(params, state, batch, labels)[0]]
 
         while True:
@@ -110,7 +112,7 @@ def hf(clf, loss, dloss=None):
                 params, state, batch, labels, x, lambd)) - dot(b, x))
             it += 1
 
-            saved_params.append(copy_vec(x))
+            saved_params.append(x)
             corr_losses.append(loss(
                 lin_comb(params, 1.0, x), state, batch, labels)[0])
 
