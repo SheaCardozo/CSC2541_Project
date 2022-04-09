@@ -25,9 +25,9 @@ def one_vec(v):
     return tree_map(lambda x: np.ones_like(x), v)
 
 
-@jit
-def copy_vec(v):
-    return tree_map(lambda x: np.array(x), v)
+# @jit
+# def copy_vec(v):
+#     return tree_map(lambda x: np.array(x), v)
 
 
 @jit
