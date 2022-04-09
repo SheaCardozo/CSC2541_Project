@@ -7,6 +7,7 @@ import optax
 import jax
 import jax.numpy as np
 
+import time
 
 def hf(clf, loss, dloss=None):
     if dloss is None:  # If a derivative function is not supplied, take it here.
@@ -174,7 +175,7 @@ def hf(clf, loss, dloss=None):
         """Performs an update using HF. Here we break Optax's API by requiring
         more information.
         """
-
+        start = time.time
         # Prepare the preconditioner
         if opt_state['precond'] == 0:
             Minv = one_vec(params)
@@ -186,6 +187,9 @@ def hf(clf, loss, dloss=None):
             Minv = Minv_factory_uncentered(
                 batch_grad, opt_state['lambda'], opt_state['alpha'])
 
+        print(f"Precond: {time.time-start}")
+        start = time.time
+
         # Turn off momentum accordingly
         if not opt_state['use_momentum']:
             opt_state['xi'] = np.array(0.0)
@@ -196,11 +200,17 @@ def hf(clf, loss, dloss=None):
             scale_vec(opt_state['xi'], opt_state['x0']), Minv, params, state,
             batch, labels, max_iter=opt_state['max_iter'])
 
+        print(f"CG: {time.time-start}")
+        start = time.time
+
         # Re-adjust lambda
         dq = dot(batch_grad, p) + 0.5 * dot(
             p, dampened(params, state, batch, labels, p, opt_state['lambda']))
         f_theta, state = loss(params, state, batch, labels)
         f_theta_p = loss(lin_comb(params, 1.0, p), state, batch, labels)[0]
+
+        print(f"Readjust Lambda: {time.time-start}")
+        start = time.time
 
         rho = (f_theta_p - f_theta) / dq
         if rho < 1 / 4:
@@ -213,6 +223,9 @@ def hf(clf, loss, dloss=None):
         # Adjust "momentum"
         opt_state['xi'] = min(1.01 * opt_state['xi'], 0.99)
 
+        print(f"Adjust Rho/Momentum: {time.time-start}")
+        start = time.time
+
         if not opt_state['line_search']:
             return p, opt_state
 
@@ -224,6 +237,9 @@ def hf(clf, loss, dloss=None):
                     c * alpha * dot(batch_grad, p):
                 break
             alpha *= beta
+
+        print(f"Line Search: {time.time-start}")
+        start = time.time
 
         return scale_vec(alpha, p), opt_state
 
