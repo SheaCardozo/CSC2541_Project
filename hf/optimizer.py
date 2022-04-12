@@ -17,7 +17,7 @@ def hf(clf, loss, dloss=None):
 
     @jit
     def network_function(params, state, batch):
-        return clf.apply(params, state, None, batch, True)[0]
+        return clf.apply(params, state, batch, True)[0]
 
     @jit
     def loss_logits(logits, labels):
@@ -88,7 +88,7 @@ def hf(clf, loss, dloss=None):
 
     def cg(
             lambd, b, x0, Minv, params, state, batch, labels,
-            max_iter=50, epsilon=5e-4, fname='cg.txt'):
+            max_iter=50, epsilon=5e-4):
         x = x0
         r = lin_comb(b, -1, dampened(params, state, batch, labels, x, lambd))
         z = hadamard(Minv, r)
@@ -124,13 +124,6 @@ def hf(clf, loss, dloss=None):
             elif it > max_iter:
                 break
 
-            # Save progress
-            out_str = 'CG: {:} / {:} - phi: {:.5f}, chkpt_loss: {:.5f}, lambd: {:.5f}'.format(
-                it, max_iter, phis[-1], corr_losses[-1], lambd)
-            with open(fname, 'a') as f:
-                f.write(out_str + '\n')
-            # Save progress
-
         # Start backtracking
         idx = 0
         for idx in range(1, len(saved_params))[::-1]:
@@ -138,17 +131,11 @@ def hf(clf, loss, dloss=None):
                 chosen_ind = idx
                 break
 
-        # Return the next initialization
-        with open(fname, 'a') as f:
-            f.write(f'Final batch loss: {corr_losses[idx]}\n')
-            f.write('=' * 80 + '\n')
-            f.flush()
-
         return saved_params[chosen_ind], x
 
     def init(
-            params, xi=0.5, lambd=1.0, alpha=0.75, max_iter=5,
-            line_search=True, fname='cg.txt', precond='uncentered',
+            params, xi=0.5, lambd=1.0, alpha=0.75, max_iter=5, min_damp=0,
+            line_search=True, precond='uncentered',
             use_momentum=True):
         """Initializes the Hessian Free optimizer.
 
@@ -159,16 +146,18 @@ def hf(clf, loss, dloss=None):
             alpha -- Power of the preconditioner
             max_iter -- Maximum number of CG iterations
             line_search -- Whether to use line search before returning updates
-            fname -- File name to print out CG iteration information
             precond -- Preconditioner, one of "centered", "uncentered", or "none"
             use_momentum -- Whether to use the information sharing between CG runs
         """
 
-        with open(fname, 'w') as f:
-            f.write('Starting experiment\n')
-            f.write('=' * 80 + '\n')
-
         assert precond in ['centered', 'uncentered', 'none']
+
+        if precond == 'none':
+            precond = 0
+        elif precond == 'centered':
+            precond = 1
+        else:
+            precond = 2
 
         return {
             'x0': zero_vec(params),
@@ -176,9 +165,9 @@ def hf(clf, loss, dloss=None):
             'alpha': np.array(alpha, dtype=np.float64),
             'xi': np.array(xi, dtype=np.float64),
             'v': zero_vec(params),
+            'min_damp': min_damp,
             'max_iter': max_iter,
             'line_search': line_search,
-            'fname': fname,
             'precond': precond,
             'use_momentum': use_momentum
         }
@@ -189,9 +178,9 @@ def hf(clf, loss, dloss=None):
         """
 
         # Prepare the preconditioner
-        if opt_state['precond'] == 'none':
+        if opt_state['precond'] == 0:
             Minv = one_vec(params)
-        elif opt_state['precond'] == 'centered':
+        elif opt_state['precond'] == 1:
             Minv = Minv_factory_centered(
                 params, state, batch, labels, opt_state['lambda'],
                 opt_state['alpha'])
@@ -207,8 +196,7 @@ def hf(clf, loss, dloss=None):
         p, opt_state['x0'] = cg(
             opt_state['lambda'], scale_vec(-1.0, batch_grad),
             scale_vec(opt_state['xi'], opt_state['x0']), Minv, params, state,
-            batch, labels, max_iter=opt_state['max_iter'],
-            fname=opt_state['fname'])
+            batch, labels, max_iter=opt_state['max_iter'])
 
         # Re-adjust lambda
         dq = dot(batch_grad, p) + 0.5 * dot(
@@ -221,6 +209,8 @@ def hf(clf, loss, dloss=None):
             opt_state['lambda'] = opt_state['lambda'] * 100 / 99
         elif rho > 3 / 4:
             opt_state['lambda'] = opt_state['lambda'] * 99 / 100
+
+        opt_state['lambda'] = max(opt_state['min_damp'], opt_state['lambda'])
 
         # Adjust "momentum"
         opt_state['xi'] = min(1.01 * opt_state['xi'], 0.99)
