@@ -30,7 +30,7 @@ def get_datasets(dataset):
             ds_builder.as_dataset(split='train', batch_size=-1))
         test_ds = tfds.as_numpy(
             ds_builder.as_dataset(split='test', batch_size=-1))
-
+        
         train_ds['image'] = (((jax.device_put(jnp.array(train_ds['image']), device=cpus[0]) / 255) - 0.5) / 0.5)
         test_ds['image'] = (((jax.device_put(jnp.array(test_ds['image']), device=cpus[0]) / 255) - 0.5) / 0.5)
 
@@ -41,3 +41,14 @@ def get_datasets(dataset):
     else:
         raise ValueError("Not Implemented")
 
+def setup_log (log_loss, optim_dir_name, optim_mag_name):
+
+    log_loss[f'{optim_mag_name}#{optim_dir_name}'] = {}
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["losses"] = []
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["val_metric"] = []
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["mag_m"] = []
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["mag_d"] = []
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["mag_inflate"] = []
+    log_loss[f'{optim_mag_name}#{optim_dir_name}']["cos_sim"] = []
+
+    return log_loss
